@@ -6,13 +6,16 @@ import validator from "validator"; // validates emails
 import rateLimit from "express-rate-limit";
 import { logEvent } from "./utils/logger.js";
 import { pool } from "./db/postgres.js";
-
+import { Resend } from "resend";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Rate limiter
 const contactLimiter = rateLimit({
@@ -82,26 +85,67 @@ app.post("/api/contact", async (req, res) => {
   const sanitizedSubject = validator.escape(subject);
 
   try {
-    await transporter.sendMail({
-      from: `"${sanitizedFirstName} ${sanitizedLastName}" <${email}>`,
-      to: process.env.EMAIL_USER,
-      subject: subject || "New Portfolio Contact",
-      text: `Name: ${sanitizedFirstName} ${sanitizedLastName} Email: ${email} Subject: ${sanitizedSubject} Message: ${sanitizedMessage}`,});
+    // Send email using Resend
+    const { data, error } = await resend.emails.send({
+      from: 'Portfolio Contact <onboarding@resend.dev>', // Use your verified domain
+      to: [process.env.EMAIL_USER], // Your receiving email
+      reply_to: email, // User's email for replies
+      subject: sanitizedSubject || "New Portfolio Contact",
+      text: `Name: ${sanitizedFirstName} ${sanitizedLastName}\nEmail: ${email}\nSubject: ${sanitizedSubject}\nMessage: ${sanitizedMessage}`,
+      html: `
+        <h3>New Contact Form Submission</h3>
+        <p><strong>Name:</strong> ${sanitizedFirstName} ${sanitizedLastName}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Subject:</strong> ${sanitizedSubject || 'None'}</p>
+        <p><strong>Message:</strong></p>
+        <p>${sanitizedMessage}</p>
+      `
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      throw new Error(error.message);
+    }
+
+    console.log('Resend email sent:', data?.id);
+
+    // Save to database (keep your existing code)
+    await pool.query(
+      `
+      INSERT INTO messages
+      (first_name, last_name, email, subject, message, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [
+        firstName,
+        lastName,
+        email,
+        subject || null,
+        message,
+        req.ip,
+      ]
+    );
 
     logEvent("SUCCESS", {
       ip: req.ip,
       email,
       subject,
+      resendId: data?.id
     });
 
     res.status(200).json({ success: true });
   } catch (error) {
-      logEvent("ERROR", {
-        ip: req.ip,
-	error: error.message,
-      });
+    console.error("Server error:", error);
+    
+    logEvent("ERROR", {
+      ip: req.ip,
+      error: error.message,
+      provider: "resend"
+    });
 
-      res.status(500).json({ error: "Failed to send email" });
+    res.status(500).json({ 
+      error: "Failed to send message. Please try again later." 
+    });
   }
 });
 
