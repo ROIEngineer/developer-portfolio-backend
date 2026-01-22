@@ -1,7 +1,6 @@
 import express from "express"; // server framework
 import cors from "cors"; // allows frontend to talk to backend
 import dotenv from "dotenv"; // keeps environment variables credentials secure
-import nodemailer from "nodemailer"; // sends emails
 import validator from "validator"; // validates emails
 import rateLimit from "express-rate-limit";
 import { logEvent } from "./utils/logger.js";
@@ -29,15 +28,6 @@ const contactLimiter = rateLimit({
     res.status(429).json({
       error: "Too many requests. Please try again later.",
     });
-  },
-});
-
-// Sends mail
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
   },
 });
 
