@@ -7,7 +7,6 @@ import rateLimit from "express-rate-limit";
 import { logEvent } from "./utils/logger.js";
 import { pool } from "./db/postgres.js";
 
-
 dotenv.config();
 
 const app = express();
@@ -82,11 +81,32 @@ app.post("/api/contact", async (req, res) => {
   const sanitizedSubject = validator.escape(subject);
 
   try {
-    await transporter.sendMail({
+    console.log(`Attempting to send email from: ${email}`);
+    console.log(`Using Gmail SMTP: ${process.env.EMAIL_USER}`);
+
+    const mailInfo = await transporter.sendMail({
       from: `"${sanitizedFirstName} ${sanitizedLastName}" <${email}>`,
       to: process.env.EMAIL_USER,
       subject: subject || "New Portfolio Contact",
       text: `Name: ${sanitizedFirstName} ${sanitizedLastName} Email: ${email} Subject: ${sanitizedSubject} Message: ${sanitizedMessage}`,});
+
+    console.log(`Email sent successfully: ${mailInfo.messageId}`);
+
+    await pool.query(
+      `
+      INSERT INTO messages
+      (first_name, last_name, email, subject, message, ip_address)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      `,
+      [
+        firstName,
+        lastName,
+        email,
+        subject || null,
+        message,
+        req.ip,
+      ]
+    );
 
     logEvent("SUCCESS", {
       ip: req.ip,
@@ -96,15 +116,33 @@ app.post("/api/contact", async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (error) {
-      logEvent("ERROR", {
-        ip: req.ip,
-	error: error.message,
-      });
+    console.error("SMTP Error details:", {
+      error: error.message,
+      code: error.code,
+      command: error.command || 'N/A'
+    });
 
-      res.status(500).json({ error: "Failed to send email" });
+    // Check for specific Gmail/SMTP errors
+    if (error.code === 'ECONNREFUSED') {
+      console.error("Connection refused - likely port blocked by Render");
+    }
+
+    logEvent("ERROR", {
+      ip: req.ip,
+      error: error.message,
+      details: error.code
+    });
+
+    res.status(500).json({ error: "Failed to send email" });
   }
 });
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Handle Pool Shutdown - Resource-awareness
+process.on("SIGINT", async () => {
+  await pool.end();
+  process.exit(0);
+});
