@@ -10,7 +10,9 @@ import { Resend } from "resend";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+}));
 app.use(express.json());
 
 // Initialize Resend
@@ -91,6 +93,16 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
       `
     });
 
+    // Explicit Resend error handling
+    if (error) {
+      logEvent("RESEND_ERROR", {
+        ip: req.ip,
+	email,
+	error: error.message,
+      });
+      throw error;
+    }
+
     await pool.query(
       `
       INSERT INTO messages
@@ -98,11 +110,11 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       `,
       [
-        firstName,
-        lastName,
+        sanitizedFirstName,
+        sanitizedLastName,
         email,
-        subject || null,
-        message,
+        sanitizedSubject || null,
+        sanitizedMessage,
         req.ip,
       ]
     );
