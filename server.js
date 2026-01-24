@@ -155,24 +155,24 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
   }
 });
 
-app.get("api/admin/messages", adminAuth, async (req, res) => {
+app.get("/api/admin/messages", adminAuth, async (req, res) => {
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 20;
 
   const offset = (page - 1) * limit;
 
   try {
-    const { rows } await pool.query(
+    const { rows } = await pool.query(
       `
       SELECT
         id,
-	first_name,
-	last_name,
-	email,
-	subject,
-	message,
-	ip_address,
-	created_at
+        first_name,
+        last_name,
+        email,
+        subject,
+        message,
+        ip_address,
+        created_at
       FROM messages
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2
