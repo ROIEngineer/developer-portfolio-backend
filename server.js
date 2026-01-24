@@ -15,6 +15,23 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Admin Auth Middleware
+const adminAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  if (token !== process.env.ADMIN_API_KEY) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  next();
+};
+
 // Initialize Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -135,6 +152,55 @@ app.post("/api/contact", contactLimiter, async (req, res) => {
     });
 
     res.status(500).json({ error: "Failed to send message. Please try again later." });
+  }
+});
+
+app.get("api/admin/messages", adminAuth, async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 20;
+
+  const offset = (page - 1) * limit;
+
+  try {
+    const { rows } await pool.query(
+      `
+      SELECT
+        id,
+	first_name,
+	last_name,
+	email,
+	subject,
+	message,
+	ip_address,
+	created_at
+      FROM messages
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2
+      `,
+      [limit, offset]
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM messages`
+    );
+
+    const total = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages,
+      messages: rows,
+    });
+  } catch (error) {
+    logEvent("ERROR", {
+      type: "ADMIN_FETCH_FAILED",
+      error: error.message,
+    });
+
+    res.status(500).json({ error: "Failed to fetch messages" });
   }
 });
 
