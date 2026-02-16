@@ -9,7 +9,6 @@ This is the backend API for a full-stack portfolio application. Built with Node.
 ## Live Demo
 
 **API Base URL:** `https://portfolio-backend-resend.onrender.com`  
-**GitHub Repository:** [Repository URL]()
 
 ## Features
 
