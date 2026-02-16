@@ -9,7 +9,7 @@ This is the backend API for a full-stack portfolio application. Built with Node.
 ## Live Demo
 
 **API Base URL:** `https://portfolio-backend-resend.onrender.com`  
-**GitHub Repository:** [Your repository URL]
+**GitHub Repository:** [Repository URL]()
 
 ## Features
 
@@ -1019,7 +1019,7 @@ This project is open source and available under the [MIT License](LICENSE).
 
 For issues or questions:
 - Open an issue on GitHub
-- Contact: [Your Email]
+- Contact: [Email](MrDurant2023@gmail.com)
 
 ## Contact
 
@@ -1028,6 +1028,3 @@ Email: MrDurant2023@gmail.com
 GitHub: [@ROIEngineer](https://github.com/ROIEngineer)  
 Portfolio: [Link](https://portfolio-web-six-ashen.vercel.app/)
 
----
-
-Built with ❤️ using Node.js, Express, and PostgreSQL
